@@ -137,7 +137,6 @@ class Bird_sound_processor():
         def Ffilter(F,fmin,fmax):
             """filter function"""
             return np.logical_and(F<fmax,F>fmin) #simples option (but should be enough for this purpose)
-            return 
         Sdata=self.split(self.data,size)
         Fsdata=self.FFT_step(Sdata)
         dt=1/self.samplerate #time step
@@ -158,18 +157,14 @@ class Bird_sound_processor():
         self.FilTdata=FilTdata
         self.FilPower=np.abs(FilTdata)**2
         Gsigma=int(5*self.samplerate/1000)
-        # print(Gsigma)
         self.FilPowerAv=ndimage.gaussian_filter1d(self.FilPower,Gsigma)
         FS=self.FilPowerAv.reshape((1,-1))[0].copy() #filtered power
         Npeak=FS.argmax() #peak position
         Slice=FS[int(max((0,Npeak-maxTwindow/2/dt))):int(min((len(FS),Npeak+maxTwindow/2/dt)))]
         Slice/=Slice.max()
-        # print(len(Slice))
         ind0=np.argwhere(Slice>cutlevel)
-        # print(ind0)
         if len(ind0)>3:
             Slice=Slice[ind0[0][0]:ind0[-1][0]]
-        # print(len(Slice))
         self.bestslice=Slice
         
         plt.figure(5)
@@ -186,20 +181,15 @@ class Bird_sound_processor():
             
         #feature duration
         Nspeak=Slice1.argmax()
-        # print(Nspeak)
-        # print(Slice1[:Nspeak])
         if Nspeak==0:
             Nsmin=0
         else:
-            # print(self.file)
-            # print(len(np.argwhere(Slice1[:Nspeak]<durationLevel)))
             if len(np.argwhere(Slice1[:Nspeak]<durationLevel)) == 0:
                 Nsmin=0
             else:
                 Nsmin=np.argwhere(Slice1[:Nspeak]<durationLevel)[-1][0]
         Nsmax=Nspeak+np.argwhere(Slice1[Nspeak:]<durationLevel)[0][0]
         self.duration_envelope=(Nsmax-Nsmin)*dt
-        # print(self.duration_envelope)
         
         #find typical frequency in the slice
         SF=ndimage.gaussian_filter1d(np.abs(fft(Slice1)),3)
@@ -214,11 +204,6 @@ class Bird_sound_processor():
         N12=int(len(SF)/2) # to cut a meaninful half of the spectrum
         ind0=np.logical_and(SF[:N12]>=SFm[:N12],SF[:N12]>=SFp[:N12])
         indm=np.argwhere(ind0==True)[1:,0]
-        # print(indm)
-        #find the most reliable max
-        # Stop=True
-        # i=0
-        # threshold=1.5
         df2=1/dt/(N2-1) #frequency step
         if len(indm)<2:
             Nmax=0
