@@ -16,6 +16,7 @@ from tkinter import filedialog
 from scipy import signal, ndimage
 from scipy.fftpack import fft, fftshift, ifft, ifftshift
 from scipy.stats.mstats import gmean
+import pandas as pd
 
 
 class Bird_sound_processor():
@@ -314,7 +315,7 @@ class Bird_sound_processor():
         np.savetxt(self.file[:-4]+'_params.dat', np.array(values).reshape((1,-1)),
                         header='\t'.join(Titles),
                         delimiter='\t',comments='')
-
+        return [['file']+Titles,[self.file.split('/')[-1][:-4]]+values]
 
 
 #_____________________________________
@@ -402,14 +403,15 @@ class sound_folder():
         self.width=Width
         self.fmean=Fmean
         if self.usefiles:
-            pass
+            '/'.join(self.files[-1].split('/')[:-1])+'/AVfftparams.dat'
         else:
             file=self.folder+'/AVfftparams.dat'
+        header='peak frequency Hz '+ '\t width at level' + str(Widthlevels[0])+ '\t width at level' + str(Widthlevels[1])+'\t fmean at level' + str(Widthlevels[0])+'\t fmean at level' + str(Widthlevels[1])
         np.savetxt(file, np.concatenate(([Fm],Width.reshape((1,-1))[0],Fmean.reshape((1,-1))[0])).reshape((1,-1)),
-                        header='peak frequency Hz '+ '\t width at level' + 
-                        str(Widthlevels[0])+ '\t width at level' + str(Widthlevels[1])+
-                        '\t fmean at level' + str(Widthlevels[0])+'\t fmean at level' + str(Widthlevels[1]),
+                        header=header,
                         delimiter='\t',comments='')
+        self.average_output=pd.DataFrame([np.concatenate(([Fm],Width.reshape((1,-1))[0],Fmean.reshape((1,-1))[0]))],
+                                         columns=header.split('\t'))
         
     def show_W(self,title=None,logscale=True):
         """plots the spectral signal"""
@@ -430,8 +432,9 @@ class sound_folder():
             if not title == None:
                 plt.title(title,fontsize=18)
                 
-    def rescan_folder(self):
+    def rescan_folder(self,outputPath = None):
         """go through the folder for th esecond time to save parameters for each """
+        Params=[]
         for f in self.files:
             if self.usefiles:
                 BS=Bird_sound_processor(f)
@@ -441,14 +444,28 @@ class sound_folder():
             # print([self.fmean[0]-self.width[0]/2,self.fmean[0]+self.width[0]/2])
             Fband=[self.fmean[0]-self.width[0]/2,self.fmean[0]+self.width[0]/2]
             BS.find_main_Tslice(Fband)
-            BS.export_params()
+            B=BS.export_params()
+            Params.append(B[1])
             print('done with '+f)
+        head=B[0]
+        # print(Params)
+        output=pd.DataFrame(Params,columns=head)
+        if outputPath == None:
+            if self.usefiles:
+                Path=os.path.dirname((os.path.abspath(__file__)))
+                outputPath=Path+'/output.csv'
+            else:
+                outputPath=self.folder+'/output.csv'
+        output.to_csv(outputPath)
+        self.output=output
             
-    def run(self):
-        """run functions to find parameters in a folder"""
+    def run(self,output=None):
+        """run functions to find parameters in a folder
+        output is the output file path"""
         self.FFT_av()
         self.export_FFTparams()
-        self.rescan_folder()
+        self.rescan_folder(outputPath=output)
+        return [self.output,self.average_output]
                 
     def show_phase(self,title):
         """show spectral phase"""
