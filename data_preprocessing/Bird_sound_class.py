@@ -315,7 +315,7 @@ class Bird_sound_processor():
         np.savetxt(self.file[:-4]+'_params.dat', np.array(values).reshape((1,-1)),
                         header='\t'.join(Titles),
                         delimiter='\t',comments='')
-        return [['file']+Titles,[self.file.split('/')[-1][:-4]]+values]
+        return [['file']+Titles,[self.file.split('\\')[-1][:-4]]+values]
 
 
 #_____________________________________
@@ -403,7 +403,7 @@ class sound_folder():
         self.width=Width
         self.fmean=Fmean
         if self.usefiles:
-            '/'.join(self.files[-1].split('/')[:-1])+'/AVfftparams.dat'
+            file='/'.join(self.files[-1].split('/')[:-1])+'/AVfftparams.dat'
         else:
             file=self.folder+'/AVfftparams.dat'
         header='peak frequency Hz '+ '\t width at level' + str(Widthlevels[0])+ '\t width at level' + str(Widthlevels[1])+'\t fmean at level' + str(Widthlevels[0])+'\t fmean at level' + str(Widthlevels[1])
