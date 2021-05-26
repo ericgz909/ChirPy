@@ -119,31 +119,6 @@ def whiten_invert(X_fft):
     x_wave = librosa.istft(X_noise_norm)
     return x_wave,X_noise_norm,sr
 
-def whiten_invert_2(X_fft,ntype='thresh_spec',threshold=3):
-    # estimate covariance matrix
-    Xcov = np.cov(X_fft)
-    # find power spectral density
-    psd = np.sqrt(np.abs(np.diag(Xcov)))
-    X_noise_norm = X_fft.copy()
-    
-    if ntype=='spec':
-        for i in range(len(psd)):
-            X_noise_norm[i,:] /= psd[i]
-    elif ntype=='mean':
-        X_noise_norm /= np.mean(psd)
-    elif ntype=='thresh_spec':
-        for i in range(len(psd)):
-            if psd[i] < np.mean(psd) + threshold * np.std(psd):
-                X_noise_norm[i,:] /= psd[i]
-    elif ntype=='thresh_amp':
-        X_noise_norm /= np.mean(psd)
-        for i in range(len(psd)):
-            if psd[i] > np.mean(psd) + threshold * np.std(psd):
-                X_noise_norm[i,:] *= psd[i]*np.mean(psd)
-        
-    x_wave = librosa.istft(X_noise_norm)
-    return x_wave,X_noise_norm,sr
-
 def list_birds(metadata_path):
     df = pd.read_csv(metadata_path)
     bird_list = df['primary_label'].drop_duplicates()
@@ -282,7 +257,7 @@ def short_audio_features_main(metadata_path,audio_fpath_short,savedir):
         bird_path=audio_fpath_short+bird_name
         print(bird_path)
         audio_clip = load_audio_clips(bird_path)
-        for clip in audio_clips:
+        for clip in audio_clip:
             features_dict = output_spectral_peaks(clip)
             final_dict = {**features_dict.copy(),**target.copy()}
             features_df = features_df.append(final_dict,ignore_index=True)
