@@ -17,6 +17,7 @@ from scipy import signal, ndimage
 from scipy.fftpack import fft, fftshift, ifft, ifftshift
 from scipy.stats.mstats import gmean
 import pandas as pd
+import librosa as ls
 
 
 class Bird_sound_processor():
@@ -274,7 +275,7 @@ class Bird_sound_processor():
         file2=self.file.split('.')[0]+'.'+Type
         sf.write(file2,self.data,self.samplerate)
         
-    def export_params(self,Widthlevels=[0.5,0.8],Fcut=100):
+    def export_params(self,Widthlevels=[0.5,0.8],Fcut=100,save=False):
         """export parameters
         Fcut is the minimum frequency to take into account for FFT"""
         X0=self.f
@@ -301,26 +302,33 @@ class Bird_sound_processor():
                     Nl=np.argwhere(Y[:Npeak]<Widthlevels[i])[-1]
             Width[i]=X[Npeak+Nh]-X[Nl]
             Fmean[i]=(X[Npeak+Nh]+X[Nl])/2
+            Centroid=np.sum(Y*X)/np.sum(Y)
+            RMS=(np.sum(Y*(X-Centroid)**2)/np.sum(Y))**0.5
+            skew=np.sum(Y*(X-Centroid)**3)/np.sum(Y)/RMS**3
+            kurtosis=np.sum(Y*(X-Centroid)**4)/np.sum(Y)/RMS**4
+            entropy=-np.sum(Y*np.log(Y))/np.log(X[-1]-X[0])
             
         self.width=Width
         self.fmean=Fmean
         
         Titles=['peak frequency Hz','width at level ' + str(Widthlevels[0]),'width at level ' + str(Widthlevels[1]),
-                'fmean at level ' + str(Widthlevels[0]),'fmean at level ' + str(Widthlevels[1]),
-                'pulse duration','pulse rep rate']
+                'fmedian at level ' + str(Widthlevels[0]),'fmedian at level ' + str(Widthlevels[1]),
+                'pulse duration','pulse rep rate',
+                'centroid','RMS width (spread)','skew','kurtosis','entropy']
         values=[Fm,Width[0],Width[1],
                 Fmean[0],Fmean[1],
-                self.duration_envelope,self.Fpeak_envelope]
-        
-        np.savetxt(self.file[:-4]+'_params.dat', np.array(values).reshape((1,-1)),
-                        header='\t'.join(Titles),
-                        delimiter='\t',comments='')
-        return [['file']+Titles,[self.file.split('\\')[-1][:-4]]+values]
+                self.duration_envelope,self.Fpeak_envelope,
+                Centroid,RMS,skew,kurtosis,entropy]
+        if save:
+            np.savetxt(self.file[:-4]+'_params.dat', np.array(values).reshape((1,-1)),
+                            header='\t'.join(Titles),
+                            delimiter='\t',comments='')
+        return [['filename']+Titles,[self.file.split('/')[-1]]+values]
 
 
 #_____________________________________
     
-class sound_folder():
+class sound_subfolder():
     def __init__(self,folder=None,fileslist=[]):
         """folder is an audio folder path. if None, then a window to choose will pop up
         fileslist is the list of full files path for the same bird"""
@@ -328,9 +336,12 @@ class sound_folder():
         if fileslist==[]:
             self.open(folder)
             self.usefiles=False
+            self.birdname=self.folder.split('/')[-1].split('\\')[-1]
         else:
             self.usefiles=True
             self.files=fileslist
+            self.birdname=fileslist[0].split('/')[-2]
+        print('processing: '+self.birdname)
         
     def open(self,folder=None,file_extention='ogg'):
         """opens and scans the folder for files"""
@@ -338,11 +349,15 @@ class sound_folder():
             folder=filedialog.askdirectory(title='folder with sound files')
         self.folder=folder
         files0=list(os.scandir(folder))
+        # print(folder)
+        
         files=[]
         for f in files0:
             if f.name.split('.')[-1] == file_extention:
                 files.append(f.name)
         self.files=files
+        # print(files)
+        
         
     def FFT_av(self,size=2**15,averaging='arithmetic',postaveraging='geometric'):
         """computes an averaged FFT for all files in the directory and saves it
@@ -366,7 +381,8 @@ class sound_folder():
         if self.usefiles:
             np.save(file.split('.')[0]+'_fullaverfft.npy',[BS.f,FFTfull])
         else:
-            np.save(self.folder+'/'+self.folder.split('/')[-1]+'_fullaverfft.npy',[BS.f,FFTfull])
+            # np.save(self.folder+'/'+self.folder.split('/')[-1]+'_fullaverfft.npy',[BS.f,FFTfull])
+            np.save(os.path.join(self.folder,self.birdname+'_fullaverfft.npy'),[BS.f,FFTfull])
         self.FFT=FFTfull
         self.f=BS.f
     
@@ -406,12 +422,12 @@ class sound_folder():
             file='/'.join(self.files[-1].split('/')[:-1])+'/AVfftparams.dat'
         else:
             file=self.folder+'/AVfftparams.dat'
-        header='peak frequency Hz '+ '\t width at level' + str(Widthlevels[0])+ '\t width at level' + str(Widthlevels[1])+'\t fmean at level' + str(Widthlevels[0])+'\t fmean at level' + str(Widthlevels[1])
+        header='peak frequency Hz '+ '\t width at level' + str(Widthlevels[0])+ '\t width at level' + str(Widthlevels[1])+'\t fmedian at level' + str(Widthlevels[0])+'\t fmedian at level' + str(Widthlevels[1])
         np.savetxt(file, np.concatenate(([Fm],Width.reshape((1,-1))[0],Fmean.reshape((1,-1))[0])).reshape((1,-1)),
                         header=header,
                         delimiter='\t',comments='')
-        self.average_output=pd.DataFrame([np.concatenate(([Fm],Width.reshape((1,-1))[0],Fmean.reshape((1,-1))[0]))],
-                                         columns=header.split('\t'))
+        self.average_output=pd.DataFrame([np.concatenate(([self.birdname],[Fm],Width.reshape((1,-1))[0],Fmean.reshape((1,-1))[0]))],
+                                         columns=['primary_label']+header.split('\t'))
         
     def show_W(self,title=None,logscale=True):
         """plots the spectral signal"""
@@ -432,9 +448,11 @@ class sound_folder():
             if not title == None:
                 plt.title(title,fontsize=18)
                 
-    def rescan_folder(self,outputPath = None):
+    def rescan_folder(self,outputPath = None,saveoutput = False):
         """go through the folder for th esecond time to save parameters for each """
         Params=[]
+        features_df = pd.DataFrame(data=None)
+        # target = {}
         for f in self.files:
             if self.usefiles:
                 BS=Bird_sound_processor(f)
@@ -446,30 +464,314 @@ class sound_folder():
             BS.find_main_Tslice(Fband)
             B=BS.export_params()
             Params.append(B[1])
-            print('done with '+f)
-        head=B[0]
-        # print(Params)
-        output=pd.DataFrame(Params,columns=head)
-        if outputPath == None:
+            #add librosa results
             if self.usefiles:
-                Path=os.path.dirname((os.path.abspath(__file__)))
-                outputPath=Path+'/output.csv'
+                BSl=librosa_bird(f)
             else:
-                outputPath=self.folder+'/output.csv'
-        output.to_csv(outputPath)
-        self.output=output
+                BSl=librosa_bird(self.folder+'/'+f)
+            features_dict = BSl.output_spectral_peaks()
+            # final_dict = {**features_dict.copy(),**target.copy()}
+            final_dict=features_dict
+            final_dict['bird name']=self.birdname
+            #combine
+            for i in range(len(B[0])):
+                final_dict[B[0][i]]=B[1][i]
+            features_df = features_df.append(final_dict,ignore_index=True)
+            print('done with '+f)
             
-    def run(self,output=None):
+        # head=B[0]
+        # # print(Params)
+        # output=pd.DataFrame(Params,columns=head)
+        if saveoutput:
+            if outputPath == None:
+                if self.usefiles:
+                    Path=os.path.dirname((os.path.abspath(__file__)))
+                    outputPath=Path+'/'+self.birdname+'.csv'
+                else:
+                    outputPath=self.folder+'/'+self.birdname+'.csv'
+            features_df.to_csv(outputPath)
+        self.output=features_df
+    
+            
+    def run(self,outputPath=None,saveoutput=False):
         """run functions to find parameters in a folder
         output is the output file path"""
         self.FFT_av()
         self.export_FFTparams()
-        self.rescan_folder(outputPath=output)
+        self.rescan_folder(outputPath=outputPath,saveoutput=saveoutput)
         return [self.output,self.average_output]
-                
-    def show_phase(self,title):
-        """show spectral phase"""
-        pass
+
+class sound_folder():
+    def __init__(self,folder=None,subfolders=[],Number_of_subfolders=0):
+        """scan subfolders in a folder
+        desired subfolders can be specified in subfolders=[...]
+        Number_of_subfolders limits the number of subfolders to be scanned (e.g. for test purposes)
+        Number_of_subfolders=0 : scans all subfolders"""
+        self.folder=folder
+        self.target_subfolders=subfolders
+        self.Nsubf=Number_of_subfolders
+        self.scanforlder()
+        # if fileslist==[]:
+        #     self.open(folder)
+        #     self.usefiles=False
+        #     self.birdname=self.folder.split('/')[-1]
+        # else:
+        #     self.usefiles=True
+        #     self.files=fileslist
+        #     self.birdname=fileslist[0].split('/')[-2]
+            
+    def scanforlder(self):
+        if self.folder==None:
+            self.folder=filedialog.askdirectory(title='folder with subfolders with sound files')
+        # self.subfolders=[x[0] for x in os.walk(self.folder)]
+        self.subfolders=[]
+        for it in os.scandir(self.folder):
+            if it.is_dir():
+                self.subfolders.append(it)
+        # print(self.subfolders)
+        
+    def run(self,save=True,outputfilename=None):
+        """scans the subfolders
+        save= True or False defines if save output or not"""
+        
+        output_single = pd.DataFrame(data=None)
+        output_average = pd.DataFrame(data=None)
+        if len(self.target_subfolders)>0:
+            folders=[]
+            for subf in self.target_subfolders:
+                if subf in self.subfolders:
+                   folders.append(subf) 
+        else:
+            if self.Nsubf>0:
+                folders=self.subfolders[:self.Nsubf]
+            else:
+                folders=self.subfolders
+        for i in range(len(folders)):
+            f=folders[i]
+            # print(str(f))
+            folder=os.path.join(self.folder,f)
+            # folder=self.folder+'/'+f
+            
+            BSF=sound_subfolder(folder)
+            [individuals,average]=BSF.run(outputPath=os.path.join(f,'parameters.csv'),saveoutput=True)
+            if i == 0:
+                output_single = individuals
+                output_average = average
+            else:
+                output_single = pd.concat([output_single,individuals])
+                output_average = pd.concat([output_average,average])
+        
+        if save:
+            if outputfilename == None:
+                outPath=filedialog.asksaveasfilename(title='file to save the output',initialdir = self.folder)
+            else:
+                outPath=os.path.join(self.folder,outputfilename)
+            output_single.to_csv(outPath+'_single.csv')
+            output_average.to_csv(outPath+'_average.csv')
+        return [output_single,output_average]
+#______________________________________
+
+class librosa_bird():
+    
+    def __init__(self,file):
+        self.file=file
+    
+    def load_audio_clips(self,audio_fpath):
+        #initialize list for holding audio clips
+        audio_clips = []
+        ext = '.ogg'
+        #recursively load audio, assuming all files in directory are audio files
+        for root,dirs,files in os.walk(audio_fpath):
+            for name in files:
+                if name[-4:] == ext:
+                    audio_clips.append(root+'/'+name)
+            #logging.info('%i audio file(s) in %s have been loaded.'%(len(files),root))
+        return audio_clips
+    
+    def librosa_load_both(self,sr=32000,window='tukey',alpha=0.5,n_fft=2048):
+        #librosa takes audio clip path and loads it as a waveform array
+        #all audio files in our study are down sampled to 32000 Hz
+        x, sr = ls.load(self.file,sr=sr)
+        self.sr=sr
+        
+        #use window function to prevent spectral leakage
+        if window == 'tukey':
+            window_func = signal.windows.tukey(x.shape[0],alpha)
+        else:
+            window_func = 1
+        x *= window_func
+        
+        #librosa's short time ft
+        X = ls.stft(x,n_fft=n_fft)
+        freqs = np.arange(0, 1 + n_fft / 2) * sr / n_fft
+        return x, X, sr, freqs
+    
+        
+    def compute_psd_params(self,X_fft):
+        Xcov = np.cov(X_fft)
+        psd = np.sqrt(np.abs(np.diag(Xcov)))
+        self.psd=psd
+        psd_mean = np.mean(psd)
+        psd_var = np.std(psd)
+        return psd, psd_mean, psd_var
+    
+    def whiten_invert(self,X_fft):
+        # estimate covariance matrix
+        Xcov = np.cov(X_fft)
+        # find power spectral density
+        psd = np.sqrt(np.abs(np.diag(Xcov)))
+        
+        X_noise_norm = X_fft.copy()
+        for i in range(len(psd)):
+            X_noise_norm[i,:] *= psd[i]/np.mean(psd)
+        x_wave = ls.istft(X_noise_norm)
+        return x_wave,X_noise_norm,self.sr
+    
+    def whiten_invert_2(self,X_fft,ntype='thresh_spec',threshold=3):
+        # estimate covariance matrix
+        Xcov = np.cov(X_fft)
+        # find power spectral density
+        psd = np.sqrt(np.abs(np.diag(Xcov)))
+        X_noise_norm = X_fft.copy()
+        
+        if ntype=='spec':
+            for i in range(len(psd)):
+                X_noise_norm[i,:] /= psd[i]
+        elif ntype=='mean':
+            X_noise_norm /= np.mean(psd)
+        elif ntype=='thresh_spec':
+            for i in range(len(psd)):
+                if psd[i] < np.mean(psd) + threshold * np.std(psd):
+                    X_noise_norm[i,:] /= psd[i]
+        elif ntype=='thresh_amp':
+            X_noise_norm /= np.mean(psd)
+            for i in range(len(psd)):
+                if psd[i] > np.mean(psd) + threshold * np.std(psd):
+                    X_noise_norm[i,:] *= psd[i]*np.mean(psd)
+                    
+        x_wave = ls.istft(X_noise_norm)
+        return x_wave,X_noise_norm,self.sr
+    
+    def sig_peak_finder_internal(self,input_signal,freqs,primary_widths=[1,200],prominence_limit=0.1,n_peaks=5):
+        input_signal_var = np.std(input_signal)
+        peaks,peak_features= signal.find_peaks(input_signal/input_signal_var,width=[1,200],prominence=prominence_limit)
+        peak_features['indexes'] = peaks
+        peak_features['frequency'] = freqs[peaks]
+        df = pd.DataFrame(peak_features)
+        top_peaks = df.sort_values(df.columns[0],ascending=False,axis=0).head(n_peaks).reset_index()
+        feature_dict = {}
+        iter_freq = []
+        iter_prom = []
+        iter_width = []
+        iter_acc = []
+        iter_index = []
+        iter_wh = []
+        iterable_features = {}
+        
+        for index,peak in top_peaks.iterrows():
+            ipsd = peak['indexes']
+            secondary_width = peak['widths']
+            lower_limit = max([0,int(ipsd-secondary_width)])
+            upper_limit = min([int(ipsd+secondary_width+1)])
+            sig_window = input_signal[lower_limit:upper_limit]/input_signal_var
+            peaks = signal.find_peaks_cwt(sig_window,widths=np.arange(1,int(secondary_width+1)),wavelet=signal.ricker)+lower_limit
+            acc_check = pd.Series([(np.abs(peaks-ipsd))/secondary_width,0]).explode().values
+            accuracy = 1 - min(acc_check)
+            
+            label_freq = 'peak%i_freqency'%index
+            label_prom = 'peak%i_prominence'%index
+            label_width = 'peak%i_width'%index
+            label_acc = 'peak%i_accuracy'%index
+            label_index = 'peak%i_index'%index
+            label_wh = 'peak%s_width_height'%index
+            
+            feature_dict[label_freq] = peak['frequency']
+            feature_dict[label_prom] = peak['prominences']
+            feature_dict[label_width] = secondary_width
+            feature_dict[label_acc] = accuracy
+            #feature_dict[label_index] = int(ipsd)
+            feature_dict[label_wh] = peak['width_heights']
+            
+            iter_freq.append(peak['frequency'])
+            iter_prom.append(peak['prominences'])
+            iter_width.append(secondary_width)
+            iter_acc.append(accuracy)
+            iter_index.append(int(ipsd))
+            iter_wh.append(peak['width_heights'])
+        
+        iterable_features['frequencies'] = iter_freq
+        iterable_features['prominences'] = iter_prom
+        iterable_features['widths'] = iter_width
+        iterable_features['accuracies'] = iter_acc
+        iterable_features['indexes'] = iter_index
+        iterable_features['width_heights'] = iter_wh
+        
+        return feature_dict,iterable_features
+    
+    def sig_peak_finder(self,input_signal,freqs,primary_widths=[1,200],prominence_limit=0.1,n_peaks=5,label_prefix='peak',extend_label=False,extension='_autocorr'):
+        input_signal_var = np.std(input_signal)
+        peaks,peak_features= signal.find_peaks(input_signal/input_signal_var,width=[1,200],prominence=prominence_limit)
+        peak_features['indexes'] = peaks
+        peak_features['frequency'] = freqs[peaks]
+        df = pd.DataFrame(peak_features)
+        top_peaks = df.sort_values(df.columns[0],ascending=False,axis=0).head(n_peaks).reset_index()
+        feature_dict = {}
+        
+        for index,peak in top_peaks.iterrows():
+            ipsd = peak['indexes']
+            secondary_width = peak['widths']
+            lower_limit = max([0,int(ipsd-secondary_width)])
+            upper_limit = min([int(ipsd+secondary_width+1)])
+            sig_window = input_signal[lower_limit:upper_limit]/input_signal_var
+            peaks = signal.find_peaks_cwt(sig_window,widths=np.arange(1,int(secondary_width+1)),wavelet=signal.ricker)+lower_limit
+            acc_check = pd.Series([(np.abs(peaks-ipsd))/secondary_width,0]).explode().values
+            accuracy = 1 - min(acc_check)
+            
+            s_index = label_prefix+str(index)
+            if extend_label: s_index+=extension
+            
+            label_freq = '%s_freqency'%s_index
+            label_prom = '%s_prominence'%s_index
+            label_width = '%s_width'%s_index
+            label_acc = '%s_accuracy'%s_index
+            label_index = '%s_index'%s_index
+            label_wh = '%s_width_height'%s_index
+            
+            feature_dict[label_freq] = peak['frequency']
+            feature_dict[label_prom] = peak['prominences']
+            feature_dict[label_width] = secondary_width
+            feature_dict[label_acc] = accuracy
+            #feature_dict[label_index] = int(ipsd)
+            feature_dict[label_wh] = peak['width_heights']
+            
+        return feature_dict
+    
+    def output_spectral_peaks(self,n_peaks_primary=5,n_peaks_secondary=3):
+        x,X,sr,freqs = self.librosa_load_both(alpha=0.1)
+        psd,psdm,psdv = self.compute_psd_params(X)
+        final_dict = {}
+        features_dict,iter_feat = self.sig_peak_finder_internal(psd,freqs,n_peaks=n_peaks_primary)
+        final_dict.update(features_dict.copy())
+        Xcov = np.cov(X)
+        for index,peak_index in enumerate(iter_feat['indexes']):
+            autocorr_col = np.abs(Xcov[peak_index,:])/psdv
+            label_prefix = 'peak%s_autocorr'%str(index)
+            autocorr_features = self.sig_peak_finder(autocorr_col,freqs,label_prefix=label_prefix,n_peaks=n_peaks_secondary)
+            final_dict.update(autocorr_features)
+        return final_dict
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #test
 # BS=Bird_sound_processor()

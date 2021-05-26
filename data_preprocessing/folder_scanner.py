@@ -20,8 +20,9 @@ in that case only these files are used in analysis"""
 files=[r'F:\bootcamp data\train_short_audio\aldfly\small\XC2628.ogg',
        r'F:\bootcamp data\train_short_audio\aldfly\small\XC16964.ogg']
 
-BSF=sound_folder(fileslist=files)
-[individuals,average]=BSF.run()
+BSF=sound_folder()
+#Number_of_subfolders=... to limit the number of subfolders to scan through
+[individuals,average]=BSF.run(outputfilename='features')
 #individuals are pandas data frame for single files
 #average is the pandas data frame for the averaged spectra across all files
-# by specifying BSF.run(output='file path') you can specify the file path for the output file
+# you can specify the output file name BSF.run(outputfilename='file name')
