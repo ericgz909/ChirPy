@@ -14,11 +14,7 @@ from Bird_sound_class import sound_folder
 
 """sound_folder() is taking either a folder argument sound_folder(folder=folder), in that case
 the entire folder is scanned,
-or a list of files corresponding to the same bird sound_folder(fileslist=[file1,file2,...])), 
-in that case only these files are used in analysis"""
-
-files=[r'F:\bootcamp data\train_short_audio\aldfly\small\XC2628.ogg',
-       r'F:\bootcamp data\train_short_audio\aldfly\small\XC16964.ogg']
+or a list of folders corresponding  sound_folder(subfolders=[folder1,folder2,...])) """
 
 BSF=sound_folder()
 #Number_of_subfolders=... to limit the number of subfolders to scan through
