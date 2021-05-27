@@ -534,8 +534,8 @@ class sound_folder():
         """scans the subfolders
         save= True or False defines if save output or not"""
         
-        output_single = pd.DataFrame(data=None)
-        output_average = pd.DataFrame(data=None)
+        self.output_single = pd.DataFrame(data=None)
+        self.output_average = pd.DataFrame(data=None)
         if len(self.target_subfolders)>0:
             folders=[]
             for subf in self.target_subfolders:
@@ -555,20 +555,20 @@ class sound_folder():
             BSF=sound_subfolder(folder)
             [individuals,average]=BSF.run(outputPath=os.path.join(f,'parameters.csv'),saveoutput=True)
             if i == 0:
-                output_single = individuals
-                output_average = average
+                self.output_single = individuals
+                self.output_average = average
             else:
-                output_single = pd.concat([output_single,individuals])
-                output_average = pd.concat([output_average,average])
+                self.output_single = pd.concat([self.output_single,individuals])
+                self.output_average = pd.concat([self.output_average,average])
         
         if save:
             if outputfilename == None:
                 outPath=filedialog.asksaveasfilename(title='file to save the output',initialdir = self.folder)
             else:
                 outPath=os.path.join(self.folder,outputfilename)
-            output_single.to_csv(outPath+'_single.csv')
-            output_average.to_csv(outPath+'_average.csv')
-        return [output_single,output_average]
+            self.output_single.to_csv(outPath+'_single.csv')
+            self.output_average.to_csv(outPath+'_average.csv')
+        return [self.output_single,self.output_average]
 #______________________________________
 
 class librosa_bird():
