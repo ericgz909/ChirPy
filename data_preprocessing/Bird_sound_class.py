@@ -510,6 +510,8 @@ class sound_folder():
         self.folder=folder
         self.target_subfolders=subfolders
         self.Nsubf=Number_of_subfolders
+        if len(subfolders)>0 and folder==None:
+            self.folder=os.path.dirname(subfolders[0])
         self.scanforlder()
         # if fileslist==[]:
         #     self.open(folder)
@@ -538,8 +540,10 @@ class sound_folder():
         self.output_average = pd.DataFrame(data=None)
         if len(self.target_subfolders)>0:
             folders=[]
-            for subf in self.target_subfolders:
-                if subf in self.subfolders:
+            ts=[os.path.realpath(sf).split('\\')[-1] for sf in self.target_subfolders] #target subfolders
+            subfolders=[d.name for d in self.subfolders] #all subfolders in the dir
+            for subf in ts:
+                if subf in subfolders:
                    folders.append(subf) 
         else:
             if self.Nsubf>0:
@@ -553,7 +557,7 @@ class sound_folder():
             # folder=self.folder+'/'+f
             
             BSF=sound_subfolder(folder)
-            [individuals,average]=BSF.run(outputPath=os.path.join(f,'parameters.csv'),saveoutput=True)
+            [individuals,average]=BSF.run(outputPath=os.path.join(folder,'parameters.csv'),saveoutput=True)
             if i == 0:
                 self.output_single = individuals
                 self.output_average = average
