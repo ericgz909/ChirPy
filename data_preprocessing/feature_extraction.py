@@ -767,7 +767,7 @@ def extract_spectral_features_long(audio_path,sr=default_sample_rate,n_fft=defau
     metadata_dict = long_audio_metadata(audio_path)
     #logging.info('Beginning extraction of {} at {}'.format(
     #    export_dict['filename'].values,date.fromtimestamp(time())))
-    x_precut = librosa.load(audio_path,sr=default_sample_rate)
+    x_precut,sr = librosa.load(audio_path,sr=default_sample_rate)
     
     export_dict_list = []
     chunk_length = 5*default_sample_rate
@@ -850,17 +850,16 @@ def preprocess_short_audio(range_specify=False,range_upper=397,range_lower=0):
         
 def preprocess_long_audio(range_specify=False,range_upper=20,range_lower=0):
     if not os.path.exists(save_path): os.mkdir(save_path)
-    bird_list = glob(long_audio_path+'*')
+    file_list = glob(long_audio_path+'*')
     if range_specify:
-        bird_list = bird_list[range_lower:range_upper]
+        file_list = file_list[range_lower:range_upper]
     
-    for bird_name in bird_list:
-        df_name = bird_name[:-4] + '_preprocess_long.csv'
+    for file_name in file_list:
+        df_name = file_name[:-4] + '_preprocess_long.csv'
         df = pd.DataFrame(data=None)
-        short_audio = load_audio_files(short_audio_path,ext=default_audio_extension)
-        for audio_file in short_audio:
-            export_dict_list = extract_spectral_features_short(audio_file)
-            df = df.append(export_dict_list,ignore_index=True)
+        long_audio = load_audio_files(file_name,ext=default_audio_extension)
+        export_dict_list = extract_spectral_features_long(audio_file)
+        df = df.append(export_dict_list,ignore_index=True)
         df.to_csv(df_name)
         
 
