@@ -848,13 +848,14 @@ def preprocess_short_audio(range_specify=False,range_upper=397,range_lower=0):
             df = df.append(export_dict,ignore_index=True)
         df.to_csv(df_name)
         
-def preprocess_long_audio(range_specify=False,range_upper=397,range_lower=0):
+def preprocess_long_audio(range_specify=False,range_upper=20,range_lower=0):
     if not os.path.exists(save_path): os.mkdir(save_path)
     bird_list = glob(long_audio_path+'*')
     if range_specify:
         bird_list = bird_list[range_lower:range_upper]
     
-        df_name = bird_name + '_preprocess_long.csv'
+    for bird_name in bird_list:
+        df_name = bird_name[:-4] + '_preprocess_long.csv'
         df = pd.DataFrame(data=None)
         short_audio = load_audio_files(short_audio_path,ext=default_audio_extension)
         for audio_file in short_audio:
