@@ -750,7 +750,7 @@ class librosa_bird():
             
         return feature_dict
     
-    def output_spectral_peaks(self,n_peaks_primary=5,n_peaks_secondary=3):
+    def output_spectral_peaks(self,n_peaks_primary=3,n_peaks_secondary=0):
         x,X,sr,freqs = self.librosa_load_both(alpha=0.1)
         psd,psdm,psdv = self.compute_psd_params(X)
         final_dict = {}
