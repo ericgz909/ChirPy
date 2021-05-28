@@ -550,8 +550,8 @@ def characterize_noise_psd(x,peak_features,alpha=0.5):
 
 # In[73]:
 
-
-def spectral_descriptors(spectrum,freqs,ext=''):
+def spectral_descriptors(spectrum_raw,freqs,ext=''):
+    spectrum = np.abs(spectrum_raw.copy())
     label_centr = 'centroid' + ext
     spec_desc = {}
     centr = np.sum(spectrum*freqs)/np.sum(spectrum)
