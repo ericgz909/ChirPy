@@ -1,0 +1,1 @@
+#filename,mean,variance,skewness,kurtosis,mode,gmean,hmean
