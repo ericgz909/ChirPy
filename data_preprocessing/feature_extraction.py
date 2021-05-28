@@ -37,7 +37,7 @@ logging.basicConfig(level=logging.INFO)
 
 
 # path to kaggle data folder, based on user system
-rel_path = '../Bird Data/'
+rel_path =r'F:\bootcamp data\\'
 
 # path to location where feature extraction dataframes will be saved
 save_path = rel_path+'processed_data/'
@@ -514,6 +514,7 @@ def split_signal_noise(x,peak_features,sr=default_sample_rate,peak_pad=default_p
         noise_dict = {}
         noise_dict['upper bound'] = len(x)
         noise_dict['lower bound'] = 0
+        print(noise_dict)
         noise_df = pd.DataFrame(data=noise_dict)
     
     return peaks_df,noise_df
@@ -767,7 +768,7 @@ def extract_spectral_features_long(audio_path,sr=default_sample_rate,n_fft=defau
     metadata_dict = long_audio_metadata(audio_path)
     #logging.info('Beginning extraction of {} at {}'.format(
     #    export_dict['filename'].values,date.fromtimestamp(time())))
-    x_precut = librosa.load(audio_path,sr=default_sample_rate)
+    x_precut = librosa.load(audio_path,sr=default_sample_rate)[0]
     
     export_dict_list = []
     chunk_length = 5*default_sample_rate
@@ -778,28 +779,38 @@ def extract_spectral_features_long(audio_path,sr=default_sample_rate,n_fft=defau
         export_dict = {}
         export_dict.update(metadata_dict.copy())
         if elapsed == 0:
+            # print(x_precut)
             x_noise_estimator = x_precut[elapsed+chunk_length:elapsed+3*chunk_length].copy()
             x_signal_region   = x_precut[elapsed:elapsed+chunk_length].copy()
+            # print('noise',x_noise_estimator,x_signal_region)
         elif elapsed+chunk_length > length:
+            # print(elapsed-2*chunk_length,elapsed)
             x_noise_estimator = x_precut[elapsed-2*chunk_length:elapsed].copy()
             x_signal_region   = x_precut[elapsed:length].copy()
+            # print('2',x_noise_estimator,x_signal_region)
         else:
-            x_noise_estimator = x_precut[int(elapsed-1.5*chunk_length):int(elapsed+1.5*chunk_length)].copy()
+            # print(int(elapsed-1.5*chunk_length),int(elapsed+1.5*chunk_length))
+            # x_noise_estimator = x_precut[int(elapsed-1.5*chunk_length):int(elapsed+1.5*chunk_length)].copy()
+            x_noise_estimator = x_precut[int(elapsed-chunk_length):int(elapsed+chunk_length)].copy()
             x_signal_region   = x_precut[elapsed:elapsed+chunk_length].copy()
+            # print('3',x_noise_estimator,x_signal_region)
+        
         
         wf = signal.windows.tukey(x_noise_estimator.shape[0],default_alpha)
-        
+        # print(elapsed)
+        # print(wf,x_noise_estimator)
+        # print(wf*x_noise_estimator)
         X_noise_estimator = librosa.stft(wf*x_noise_estimator)
         freqs = np.arange(0, 1 + n_fft / 2) * sr / n_fft
 
         # load and stft
         # noise reduction 0th order
-        x_NR,X_NR,freqs = noise_reduction(x_noise_estimator,X_noise_estimator,window_function)
+        x_NR,X_NR,freqs = noise_reduction(x_noise_estimator,X_noise_estimator,wf)
         # find peaks for noise reduction
         peaks, peaks_df = find_x_peaks(x_NR)
         psd,x_c,X_c = characterize_noise_psd(x_NR,peaks_df)
         # noise reduction 1st order
-        x_NR2,X_NR2,freqs = noise_reduction(x,X_c,window_function,filter_red=True,filter_red_val=128)
+        x_NR2,X_NR2,freqs = noise_reduction(x_c,X_c,wf,filter_red=True,filter_red_val=128)
         #analyze denoised signal
         psd_NR2,mu,sigma = compute_psd_data(X_NR2)
 
@@ -819,7 +830,7 @@ def extract_spectral_features_long(audio_path,sr=default_sample_rate,n_fft=defau
         elapsed_seconds = int(elapsed/32000)+5
         row_id_str = '{}_{}_{}'.format(metadata_dict['audio_id'],metadata_dict['site'],elapsed_seconds)
         row_id_dict = {'row_id':row_id_str}
-        row_id_dict.update({'seconds':elapsed_seconds.copy()})
+        row_id_dict.update({'seconds':elapsed_seconds})
         export_dict.update(row_id_dict)
         if train_metadata:
             birds_value = train_metadata.loc[train_metadata['seconds']==elapsed_seconds]['birds'].values
@@ -851,15 +862,16 @@ def preprocess_short_audio(range_specify=False,range_upper=397,range_lower=0):
 def preprocess_long_audio(range_specify=False,range_upper=20,range_lower=0):
     if not os.path.exists(save_path): os.mkdir(save_path)
     bird_list = glob(long_audio_path+'*')
+    # print(bird_list)
     if range_specify:
         bird_list = bird_list[range_lower:range_upper]
     
     for bird_name in bird_list:
         df_name = bird_name[:-4] + '_preprocess_long.csv'
         df = pd.DataFrame(data=None)
-        short_audio = load_audio_files(short_audio_path,ext=default_audio_extension)
-        for audio_file in short_audio:
-            export_dict_list = extract_spectral_features_short(audio_file)
+        long_audio = load_audio_files(long_audio_path,ext=default_audio_extension)
+        for audio_file in long_audio:
+            export_dict_list = extract_spectral_features_long(audio_file)
             df = df.append(export_dict_list,ignore_index=True)
         df.to_csv(df_name)
         
@@ -873,5 +885,5 @@ def preprocess_long_audio(range_specify=False,range_upper=20,range_lower=0):
 # In[ ]:
 
 
-
+preprocess_long_audio(range_specify=True,range_upper=1,range_lower=0)
 
